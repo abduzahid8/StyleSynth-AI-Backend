@@ -1,0 +1,15 @@
+# Virtual environment
+venv/
+*.pyc
+__pycache__/
+
+# Environment variables
+.env
+
+# Generated images (if any are saved locally)
+*.png
+*.jpg
+*.jpeg
+
+# IDE specific files
+.vscode/

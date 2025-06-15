@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StyleSynth AI Стилист</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .hero {
+            background: linear-gradient(135deg, #3a0ca3 0%, #7209b7 50%, #f72585 100%);
+            background-size: 200% 200%;
+            animation: gradientBG 15s ease infinite;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            transform: translateY(20px);
+            opacity: 0;
+            animation: fadeInUp 1s ease-out forwards;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        @keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        @keyframes fadeInUp {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .form-section {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 0.8s ease-out;
+        }
+
+        .form-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .form-card {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .form-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .chat-container {
+            max-height: 400px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        .chat-message {
+            border-radius: 1rem;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.75rem;
+            max-width: 80%;
+        }
+
+        .user-message {
+            background-color: #6366f1;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 0.25rem;
+        }
+
+        .bot-message {
+            background-color: #f3f4f6;
+            margin-right: auto;
+            border-bottom-left-radius: 0.25rem;
+        }
+
+        .photo-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .file-upload-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            border: 2px dashed #d1d5db;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-upload-label:hover {
+            border-color: #8b5cf6;
+            background-color: #f5f3ff;
+        }
+
+        .fashion-image {
+            max-width: 100%;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.3s;
+        }
+
+        .fashion-image:hover {
+            transform: scale(1.03);
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #6366f1;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased text-gray-800">
+    <section id="home" class="hero text-white">
+        <div class="hero-content text-center px-4">
+            <div class="mb-6">
+                <i class="fas fa-star text-5xl mb-4 animate-pulse"></i>
+                <h1
+                    class="text-4xl md:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
+                    Welcome to StyleSynth AI</h1>
+                <p class="text-xl md:text-2xl mb-8 max-w-2xl mx-auto text-white/90">Your personal AI stylist that
+                    creates perfect outfits just for you</p>
+                <div class="mt-8">
+                    <a href="#stylist"
+                        class="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white font-medium shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                        Discover Your Style
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="stylist" class="form-section py-20 px-4 bg-gradient-to-b from-gray-50 to-white">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Ваш персональный AI стилист</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">Опишите ваш стиль, предпочтения и получите
+                    персонализированные рекомендации</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-xl overflow-hidden">
+                <div class="p-6 md:p-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div>
+                            <label for="body-type-select" class="block text-sm font-medium text-gray-700 mb-2">Тип
+                                телосложения</label>
+                            <select id="body-type-select"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                                <option value="стандартный">Стандартное телосложение</option>
+                                <option value="плотный">Плотное телосложение</option>
+                                <option value="атлетический">Атлетическое телосложение</option>
+                                <option value="худощавый">Худощавое телосложение</option>
+                                <option value="полный">Полное телосложение</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Загрузите ваше фото</label>
+                            <label for="user-photo" class="file-upload-label">
+                                <i class="fas fa-camera text-3xl text-purple-500 mb-2"></i>
+                                <span class="text-gray-600">Нажмите для загрузки фото</span>
+                                <input type="file" id="user-photo" accept="image/*" class="hidden"
+                                    onchange="previewPhoto(event)">
+                            </label>
+                            <img id="photo-preview" class="photo-preview" src="#" alt="Предварительный просмотр фото">
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <div id="chat-container" class="chat-container mb-6 p-4 bg-gray-50 rounded-lg h-64">
+                            <div class="chat-message bot-message">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0 bg-purple-500 rounded-full p-2 text-white mr-3">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-800">StyleSynth AI</p>
+                                        <p class="text-gray-700">Привет! Я ваш личный стилист. Расскажите, какой образ
+                                            вы ищете? Например: "Повседневный образ для офиса" или "Вечерний наряд для
+                                            свидания".</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex">
+                            <input type="text" id="user-input" placeholder="Например: деловой костюм для встречи..."
+                                class="flex-grow px-4 py-3 rounded-l-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                            <button onclick="sendMessage()" id="send-button"
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-r-lg transition flex items-center">
+                                <i class="fas fa-paper-plane mr-2"></i> Отправить
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="generated-content" class="hidden">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Рекомендованные образы</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="image-container">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const BACKEND_URL = 'http://127.0.0.1:5000'; // Убедитесь, что это соответствует адресу вашего Flask-сервера
+
+        // Make form section visible on scroll
+        document.addEventListener('DOMContentLoaded', function () {
+            const formSection = document.querySelector('.form-section');
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            observer.observe(formSection);
+        });
+
+        let photoBase64 = null; // Переменная для хранения Base64 строки изображения
+
+        function previewPhoto(event) {
+            const input = event.target;
+            const preview = document.getElementById('photo-preview');
+
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+
+                reader.onload = function (e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    // Сохраняем Base64 строку (без "data:image/jpeg;base64," префикса)
+                    photoBase64 = e.target.result.split(',')[1]; 
+                }
+
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                photoBase64 = null;
+                preview.src = '#';
+                preview.style.display = 'none';
+            }
+        }
+
+        // Chat functionality
+        async function sendMessage() {
+            const userInput = document.getElementById('user-input');
+            const message = userInput.value.trim();
+            const bodyType = document.getElementById('body-type-select').value;
+            const sendButton = document.getElementById('send-button');
+            const chatContainer = document.getElementById('chat-container');
+
+            if (message === '' && !photoBase64) {
+                alert('Пожалуйста, введите сообщение или загрузите фото.');
+                return;
+            }
+
+            // Добавляем сообщение пользователя в чат
+            addMessageToChat(message, 'user');
+
+            // Очищаем поле ввода и фото
+            userInput.value = '';
+            document.getElementById('user-photo').value = ''; // Сбросить выбранный файл
+            document.getElementById('photo-preview').style.display = 'none'; // Скрыть превью
+            photoBase64 = null; // Очистить Base64 фото
+
+            // Показываем индикатор загрузки
+            const loadingMessageDiv = addMessageToChat('<div class="spinner"></div> AI думает...', 'bot', true);
+            sendButton.disabled = true; // Отключаем кнопку отправки
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        body_type: bodyType,
+                        image: photoBase64 // Отправляем Base64 фото или null
+                    })
+                });
+
+                const data = await response.json();
+
+                // Удаляем индикатор загрузки
+                loadingMessageDiv.remove();
+
+                if (response.ok) {
+                    addMessageToChat(data.response, 'bot');
+                    if (data.image_url) {
+                        showGeneratedImages([data.image_url]);
+                    } else {
+                        addMessageToChat("Не удалось сгенерировать изображение. Попробуйте еще раз или измените запрос.", 'bot');
+                    }
+                } else {
+                    addMessageToChat(`Ошибка: ${data.error || 'Неизвестная ошибка на сервере.'}`, 'bot');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                loadingMessageDiv.remove(); // Удаляем индикатор загрузки даже при ошибке сети
+                addMessageToChat('Произошла ошибка при подключении к серверу. Пожалуйста, попробуйте позже.', 'bot');
+            } finally {
+                sendButton.disabled = false; // Включаем кнопку отправки
+            }
+        }
+
+        function addMessageToChat(message, sender, isTemporary = false) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}-message`;
+
+            if (sender === 'user') {
+                messageDiv.innerHTML = `
+                    <div class="flex items-start justify-end">
+                        <div>
+                            <p class="text-white">${message}</p>
+                        </div>
+                        <div class="flex-shrink-0 bg-blue-500 rounded-full p-2 text-white ml-3">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    </div>
+                `;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-purple-500 rounded-full p-2 text-white mr-3">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800">StyleSynth AI</p>
+                            <p class="text-gray-700">${message}</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight; // Прокрутка к последнему сообщению
+
+            if (isTemporary) {
+                return messageDiv; // Возвращаем ссылку на элемент для последующего удаления
+            }
+        }
+
+        function showGeneratedImages(imageUrls) {
+            const container = document.getElementById('image-container');
+            const generatedContent = document.getElementById('generated-content');
+
+            // Clear previous images
+            container.innerHTML = '';
+
+            // Add new images
+            imageUrls.forEach(url => {
+                const imgDiv = document.createElement('div');
+                imgDiv.className = 'overflow-hidden rounded-lg shadow-md hover:shadow-lg transition';
+                imgDiv.innerHTML = `
+                    <img src="${url}" alt="Рекомендованный образ" class="fashion-image w-full h-64 object-cover">
+                `;
+                container.appendChild(imgDiv);
+            });
+
+            // Show the container
+            generatedContent.classList.remove('hidden');
+
+            // Scroll to the images
+            generatedContent.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Allow sending message with Enter key
+        document.getElementById('user-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+
+</html>
