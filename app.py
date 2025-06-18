@@ -7,6 +7,7 @@ from io import BytesIO
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
+import json # <-- Добавьте импорт json
 
 # Импортируем необходимые классы из Flask-SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
@@ -16,10 +17,17 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app) # Enable CORS for all routes
 
-# --- Database Configuration (НОВАЯ ЧАСТЬ) ---
-# Получаем URL базы данных из переменных окружения Render.com
-# Для локальной разработки, используем .env, для Render - напрямую из переменных окружения
-app.config['postgresql://stylesynth_db_user:J9ENRI4k3tWz9PXdMx5xQ2rkfSlC3yfC@dpg-d18stijuibrs73e142p0-a.singapore-postgres.render.com/stylesynth_db'] = os.environ.get('DATABASE_URL') or "YOUR_POSTGRES_EXTERNAL_DATABASE_URL"
+# --- Database Configuration (ИСПРАВЛЕННАЯ ЧАСТЬ) ---
+# Получаем URL базы данных из переменных окружения Render.com (DATABASE_URL)
+# Если переменная окружения DATABASE_URL не установлена (для локальной разработки),
+# используем прямой URL базы данных.
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    # Используйте ваш прямой URL базы данных здесь, если запускаете локально без .env
+    # ВНИМАНИЕ: Для деплоя на Render, убедитесь, что DATABASE_URL установлен в переменных окружения Render.
+    database_url = "postgresql://stylesynth_db_user:J9ENRI4k3tWz9PXdMx5xQ2rkfSlC3yfC@dpg-d18stijuibrs73e142p0-a.singapore-postgres.render.com/stylesynth_db"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Отключаем, чтобы избежать предупреждений
 
 # Инициализируем SQLAlchemy
@@ -313,5 +321,73 @@ def generate_image():
         return jsonify({"error": "Failed to generate image"}), 500
 
 # --- Existing
-if __name__ == "__main__":
+from urllib.parse import urlparse # Add this import at the top
+
+@app.route('/api/user/add_appearance/<int:user_id>', methods=['POST'])
+def add_user_appearance(user_id):
+    if 'image' not in request.files:
+        return jsonify({"error": "No image part in the request"}), 400
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"error": "No selected image"}), 400
+
+    try:
+        image_data = Image.open(BytesIO(file.read()))
+        analysis_result = analyze_user_appearance(image_data) # Use the specific function for appearance analysis
+
+        if analysis_result:
+            try:
+                parsed_analysis = json.loads(analysis_result)
+                skin_tone = parsed_analysis.get('skin_tone')
+                appearance_tone = parsed_analysis.get('appearance_tone')
+            except json.JSONDecodeError:
+                skin_tone = "unknown"
+                appearance_tone = "unknown"
+                print(f"Warning: Gemini appearance analysis not in expected JSON format: {analysis_result}")
+        else:
+            skin_tone = "unknown"
+            appearance_tone = "unknown"
+
+        # Здесь вам нужно будет решить, где хранить эту информацию.
+        # Можно добавить поля 'skin_tone' и 'appearance_tone' в модель User.
+        # Пока что просто вернем результат анализа.
+        return jsonify({
+            "message": "User appearance analyzed successfully",
+            "user_id": user_id,
+            "analysis": {"skin_tone": skin_tone, "appearance_tone": appearance_tone}
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# Если у вас есть роут `/analyze`, он должен быть полноценным, например:
+@app.route('/analyze', methods=['POST'])
+def analyze_image_route():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image part in the request"}), 400
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"error": "No selected image"}), 400
+
+    try:
+        image_data = Image.open(BytesIO(file.read()))
+        analysis_result = analyze_image_with_gemini(image_data) # Use the specific function for clothing analysis
+        if analysis_result:
+            return jsonify({"analysis": analysis_result}), 200
+        else:
+            return jsonify({"error": "Failed to analyze image"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# Main execution block
+if __name__ == '__main__':
+    # ВНИМАНИЕ: db.create_all() не следует вызывать здесь для продакшн-серверов типа Render.
+    # Это вызовет создание таблиц при каждом запуске приложения, что неэффективно и может привести к ошибкам.
+    # Для создания таблиц используйте маршрут /create_db после деплоя.
+
+    # Для локальной разработки, если очень хочется:
+    # with app.app_context():
+    #     db.create_all()
+
     app.run(debug=True)
