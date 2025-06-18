@@ -7,7 +7,7 @@ from io import BytesIO
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
-import json # <-- Добавьте импорт json
+import json # <-- Убедитесь, что этот импорт присутствует
 
 # Импортируем необходимые классы из Flask-SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
@@ -17,14 +17,18 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app) # Enable CORS for all routes
 
-# --- Database Configuration (ИСПРАВЛЕННАЯ ЧАСТЬ) ---
-# Получаем URL базы данных из переменных окружения Render.com (DATABASE_URL)
-# Если переменная окружения DATABASE_URL не установлена (для локальной разработки),
-# используем прямой URL базы данных.
+# --- Database Configuration (ИСПРАВЛЕННАЯ И ОКОНЧАТЕЛЬНАЯ ВЕРСИЯ) ---
+# Получаем URL базы данных из переменных окружения Render.com (ключ DATABASE_URL)
+# Если переменная окружения DATABASE_URL не установлена (например, для локальной разработки),
+# используем прямой URL базы данных как резервный вариант.
+# ВНИМАНИЕ: Для продакшн-деплоя на Render, убедитесь, что DATABASE_URL установлен
+# в переменных окружения вашего веб-сервиса на Render.com.
 database_url = os.environ.get('DATABASE_URL')
 if not database_url:
-    # Используйте ваш прямой URL базы данных здесь, если запускаете локально без .env
-    # ВНИМАНИЕ: Для деплоя на Render, убедитесь, что DATABASE_URL установлен в переменных окружения Render.
+    # Замените этот URL на ваш актуальный External Database URL с Render.com,
+    # если вы запускаете локально БЕЗ .env файла.
+    # Для деплоя на Render.com, эта строка не будет использоваться,
+    # так как DATABASE_URL будет предоставлен переменной окружения.
     database_url = "postgresql://stylesynth_db_user:J9ENRI4k3tWz9PXdMx5xQ2rkfSlC3yfC@dpg-d18stijuibrs73e142p0-a.singapore-postgres.render.com/stylesynth_db"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
@@ -33,7 +37,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Отключаем, чт�
 # Инициализируем SQLAlchemy
 db = SQLAlchemy(app)
 
-# Определяем модель данных для пользователя (НОВАЯ ЧАСТЬ)
+# Определяем модель данных для пользователя
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -43,7 +47,7 @@ class User(db.Model):
     def __repr__(self):
         return '<User %r>' % self.username
 
-# Определяем модель данных для предмета гардероба (НОВАЯ ЧАСТЬ)
+# Определяем модель данных для предмета гардероба
 class WardrobeItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -57,7 +61,7 @@ class WardrobeItem(db.Model):
         return '<WardrobeItem %r>' % self.image_url
 
 
-# --- Existing API Key Setup (проверьте, что они есть в Render Environment Variables) ---
+# --- API Key Setup (проверьте, что они есть в Render Environment Variables) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 
@@ -71,15 +75,12 @@ if not REPLICATE_API_TOKEN:
     )
 
 genai.configure(api_key=GEMINI_API_KEY)
-# Настройка Replicate API (если требуется, обычно он работает через os.environ.get)
-# os.environ["REPLICATE_API_TOKEN"] = REPLICATE_API_TOKEN
 
 
 # Функция для анализа изображения с помощью Gemini Pro Vision
 def analyze_image_with_gemini(image_data):
     try:
         model = genai.GenerativeModel('gemini-pro-vision')
-        # Отправляем изображение и запрос модели
         response = model.generate_content([
             "Analyze this image of clothing. Identify the type of garment (e.g., shirt, pants, dress, shoe, jacket), its primary color(s), and its general style (e.g., casual, formal, sporty, elegant). "
             "Return the answer as a JSON object with keys: 'category', 'colors', 'style'. "
@@ -88,9 +89,15 @@ def analyze_image_with_gemini(image_data):
         ])
         # Парсим ответ, ожидая JSON
         try:
-            return response.text.strip().replace("```json", "").replace("```", "").strip()
-        except ValueError:
-            return response.text.strip() # Возвращаем текст, если не удалось распарсить JSON
+            # Улучшенное удаление ```json и ``` для более надежного парсинга
+            text_response = response.text.strip()
+            if text_response.startswith("```json"):
+                text_response = text_response[len("```json"):].strip()
+            if text_response.endswith("```"):
+                text_response = text_response[:-len("```")].strip()
+            return text_response
+        except ValueError: # Если не удалось удалить маркеры
+            return response.text.strip()
     except Exception as e:
         print(f"Error analyzing image with Gemini: {e}")
         return None
@@ -106,7 +113,12 @@ def analyze_user_appearance(image_data):
             image_data
         ])
         try:
-            return response.text.strip().replace("```json", "").replace("```", "").strip()
+            text_response = response.text.strip()
+            if text_response.startswith("```json"):
+                text_response = text_response[len("```json"):].strip()
+            if text_response.endswith("```"):
+                text_response = text_response[:-len("```")].strip()
+            return text_response
         except ValueError:
             return response.text.strip()
     except Exception as e:
@@ -116,8 +128,6 @@ def analyze_user_appearance(image_data):
 
 # Функция для генерации изображения одежды (Используем Replicate)
 def generate_clothing_image(prompt):
-    # Здесь используется та же модель, что и ранее, но можно экспериментировать
-    # Убедитесь, что эта модель доступна и имеет соответствующий API токен
     output = replicate.run(
         "stability-ai/stable-diffusion:ac732df830a8c0147c2eed5740b2f7667232142477c8ce6d2aca4e79ae402766",
         input={"prompt": prompt}
@@ -126,7 +136,7 @@ def generate_clothing_image(prompt):
         return output[0]  # Возвращаем URL сгенерированного изображения
     return None
 
-# --- NEW ROUTES FOR DATABASE AND WARDROBE (НОВЫЕ РОУТЫ) ---
+# --- НОВЫЕ РОУТЫ ДЛЯ БАЗЫ ДАННЫХ И ГАРДЕРОБА ---
 
 @app.route('/create_db')
 def create_db_tables():
@@ -136,6 +146,7 @@ def create_db_tables():
             db.create_all()
         return "Database tables created successfully!"
     except Exception as e:
+        # Важно: В продакшене лучше не возвращать raw exception, а логировать его.
         return f"Error creating database tables: {e}", 500
 
 @app.route('/api/user/add', methods=['POST'])
@@ -152,6 +163,8 @@ def add_user():
             db.session.commit()
             return jsonify({"message": "User added successfully", "user_id": new_user.id}), 201
     except Exception as e:
+        # Логируем ошибку для отладки
+        print(f"Error adding user: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/wardrobe/add/<int:user_id>', methods=['POST'])
@@ -175,6 +188,7 @@ def add_wardrobe_item(user_id):
     # Анализ изображения одежды с помощью Gemini
     analysis_result = analyze_image_with_gemini(image_data)
     
+    parsed_analysis = {} # Инициализация для случая, если парсинг не удался
     if analysis_result:
         try:
             parsed_analysis = json.loads(analysis_result) # Парсим JSON
@@ -191,8 +205,6 @@ def add_wardrobe_item(user_id):
         color = "unknown"
         style = "unknown"
 
-    # !!! В реальном приложении тут будет URL загруженного изображения !!!
-    # Пока что заглушка:
     mock_image_url = f"https://placehold.co/600x400/png?text=Item_{user_id}_{file.filename}"
 
     try:
@@ -216,6 +228,7 @@ def add_wardrobe_item(user_id):
                 "analysis": parsed_analysis # Отправляем клиенту, чтобы он видел
             }), 201
     except Exception as e:
+        print(f"Error adding wardrobe item: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/wardrobe/list/<int:user_id>', methods=['GET'])
@@ -236,11 +249,11 @@ def list_wardrobe_items(user_id):
             } for item in items]
             return jsonify({"user_id": user_id, "wardrobe": items_data}), 200
     except Exception as e:
+        print(f"Error listing wardrobe items: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/outfit/suggest/<int:user_id>', methods=['POST'])
 def suggest_outfit(user_id):
-    # Этот роут будет самой сложной частью
     data = request.json
     event = data.get('event', 'casual') # Тип мероприятия
     user_appearance_info = data.get('user_appearance_info', {}) # Например, цвет кожи, если анализировали селфи
@@ -255,12 +268,6 @@ def suggest_outfit(user_id):
             user_wardrobe = WardrobeItem.query.filter_by(user_id=user_id).all()
             if not user_wardrobe:
                 return jsonify({"message": "No items in wardrobe to suggest an outfit."}), 200
-
-            # --- Логика AI для составления образа (Здесь потребуется много работы!) ---
-            # Это ОЧЕНЬ упрощенный пример. Реальная логика будет сложнее.
-            # 1. Подготовить промпт для Gemini, используя данные о гардеробе, событии и пользователе.
-            # 2. Вызвать Gemini, чтобы он предложил комбинации.
-            # 3. Вернуть предложенные комбинации.
 
             wardrobe_description = ""
             for item in user_wardrobe:
@@ -292,18 +299,27 @@ def suggest_outfit(user_id):
             model = genai.GenerativeModel('gemini-pro') # Используем Gemini Pro для текстового анализа
             gemini_response = model.generate_content(gemini_prompt)
             
+            suggested_outfits = []
             try:
-                suggested_outfits = json.loads(gemini_response.text.strip().replace("```json", "").replace("```", "").strip())
+                # Опять же, более надежная очистка и парсинг
+                raw_text = gemini_response.text.strip()
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text[len("```json"):].strip()
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-len("```")].strip()
+                suggested_outfits = json.loads(raw_text)
             except json.JSONDecodeError:
                 suggested_outfits = [{"error": "Could not parse Gemini's outfit suggestions. Raw response: " + gemini_response.text}]
+                print(f"Warning: Gemini outfit suggestion not in expected JSON format: {gemini_response.text}")
 
             return jsonify({"user_id": user_id, "suggested_outfits": suggested_outfits}), 200
 
     except Exception as e:
+        print(f"Error suggesting outfit: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-# --- Existing /generate route (МОЖЕТЕ ОСТАВИТЬ ИЛИ УДАЛИТЬ ПО ЖЕЛАНИЮ) ---
+# --- Роут для генерации изображения (по желанию) ---
 @app.route('/generate', methods=['POST'])
 def generate_image():
     data = request.json
@@ -320,9 +336,6 @@ def generate_image():
     else:
         return jsonify({"error": "Failed to generate image"}), 500
 
-# --- Existing
-from urllib.parse import urlparse # Add this import at the top
-
 @app.route('/api/user/add_appearance/<int:user_id>', methods=['POST'])
 def add_user_appearance(user_id):
     if 'image' not in request.files:
@@ -335,6 +348,7 @@ def add_user_appearance(user_id):
         image_data = Image.open(BytesIO(file.read()))
         analysis_result = analyze_user_appearance(image_data) # Use the specific function for appearance analysis
 
+        parsed_analysis = {}
         if analysis_result:
             try:
                 parsed_analysis = json.loads(analysis_result)
@@ -349,18 +363,28 @@ def add_user_appearance(user_id):
             appearance_tone = "unknown"
 
         # Здесь вам нужно будет решить, где хранить эту информацию.
-        # Можно добавить поля 'skin_tone' и 'appearance_tone' в модель User.
-        # Пока что просто вернем результат анализа.
+        # Идеально, добавить поля 'skin_tone' и 'appearance_tone' в модель User.
+        # Например:
+        # with app.app_context():
+        #     user = User.query.get(user_id)
+        #     if user:
+        #         user.skin_tone = skin_tone
+        #         user.appearance_tone = appearance_tone
+        #         db.session.commit()
+        #     else:
+        #         return jsonify({"error": "User not found"}), 404
+
         return jsonify({
             "message": "User appearance analyzed successfully",
             "user_id": user_id,
             "analysis": {"skin_tone": skin_tone, "appearance_tone": appearance_tone}
         }), 200
     except Exception as e:
+        print(f"Error analyzing user appearance: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-# Если у вас есть роут `/analyze`, он должен быть полноценным, например:
+# Роут для анализа изображения (отдельный, если нужен)
 @app.route('/analyze', methods=['POST'])
 def analyze_image_route():
     if 'image' not in request.files:
@@ -373,21 +397,17 @@ def analyze_image_route():
         image_data = Image.open(BytesIO(file.read()))
         analysis_result = analyze_image_with_gemini(image_data) # Use the specific function for clothing analysis
         if analysis_result:
-            return jsonify({"analysis": analysis_result}), 200
+            try:
+                parsed_result = json.loads(analysis_result)
+                return jsonify({"analysis": parsed_result}), 200
+            except json.JSONDecodeError:
+                return jsonify({"error": "Gemini analysis result was not valid JSON.", "raw_response": analysis_result}), 500
         else:
             return jsonify({"error": "Failed to analyze image"}), 500
     except Exception as e:
+        print(f"Error in /analyze route: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-# Main execution block
 if __name__ == '__main__':
-    # ВНИМАНИЕ: db.create_all() не следует вызывать здесь для продакшн-серверов типа Render.
-    # Это вызовет создание таблиц при каждом запуске приложения, что неэффективно и может привести к ошибкам.
-    # Для создания таблиц используйте маршрут /create_db после деплоя.
-
-    # Для локальной разработки, если очень хочется:
-    # with app.app_context():
-    #     db.create_all()
-
     app.run(debug=True)
