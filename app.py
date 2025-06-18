@@ -7,7 +7,7 @@ from io import BytesIO
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
-import json # <-- Убедитесь, что этот импорт присутствует
+import json
 
 # Импортируем необходимые классы из Flask-SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
@@ -53,8 +53,8 @@ class WardrobeItem(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     image_url = db.Column(db.String(255), nullable=False) # URL для хранения изображения (например, на облачном хранилище)
     category = db.Column(db.String(50), nullable=True) # Рубашка, брюки, платье
-    color = db.Column(db.String(50), nullable=True)    # Красный, синий, и т.д.
-    style = db.Column(db.String(50), nullable=True)     # Повседневный, деловой, вечерний
+    color = db.Column(db.String(50), nullable=True)     # Красный, синий, и т.д.
+    style = db.Column(db.String(50), nullable=True)      # Повседневный, деловой, вечерний
     # Дополнительные поля могут быть добавлены позже
 
     def __repr__(self):
@@ -409,5 +409,11 @@ def analyze_image_route():
         return jsonify({"error": str(e)}), 500
 
 
+# Это условие нужно только для локальной разработки.
+# Gunicorn на Render будет импортировать 'app' напрямую.
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Если вы хотите, чтобы приложение запускалось локально, используйте
+    # app.run() с указанием порта из переменных окружения или по умолчанию.
+    # Для Render этот блок не нужен для работы.
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
