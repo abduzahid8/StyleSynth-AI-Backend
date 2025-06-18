@@ -313,5 +313,3 @@ def generate_image():
         return jsonify({"error": "Failed to generate image"}), 500
 
 # --- Existing
-if __name__ == "__main__":
-    app.run(debug=True)
