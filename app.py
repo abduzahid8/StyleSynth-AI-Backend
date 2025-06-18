@@ -120,50 +120,84 @@ class WardrobeItem(db.Model):
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """
-    Обрабатывает запросы от фронтенда для получения рекомендаций стилиста AI.
-    Принимает JSON с 'message', 'body_type' и 'image' (Base64).
-    """
     data = request.get_json()
     user_message = data.get('message', '')
     body_type = data.get('body_type', 'стандартный')
-    image_base64 = data.get('image', None)
+    image_base64 = data.get('image', None) # Base64 строка изображения
 
     if not user_message and not image_base64:
-        return jsonify({"error": "No message or image provided."}), 400
+        return jsonify({"error": "No message or image provided. Please send a message or an image."}), 400
 
-    # --- Логика обработки запроса AI (ЗАГЛУШКА) ---
-    ai_response_text = "Извините, функция AI стилиста пока не реализована."
-    generated_image_url = None
+    ai_response_text = "Извините, произошла ошибка или я не смог понять ваш запрос."
+    generated_image_url = "https://via.placeholder.com/400x300?text=Error+or+No+Image" # Заглушка по умолчанию
 
-    if image_base64:
-        try:
-            # Декодируем Base64 в байты изображения (для будущей обработки или отправки в AI)
-            image_bytes = base64.b64decode(image_base64)
-            # Здесь вы могли бы отправить image_bytes в реальный AI-сервис
-            ai_response_text = f"Я получил ваше фото и запрос: '{user_message}'. Тип телосложения: {body_type}. " \
-                               f"Сейчас я анализирую это, чтобы дать вам лучшие рекомендации."
-            # Пример URL для изображения (ЗАМЕНИТЕ НА РЕАЛЬНЫЙ URL ОТ AI)
-            generated_image_url = "https://via.placeholder.com/400x300?text=AI+Outfit+Suggestion"
+    try:
+        model = genai.GenerativeModel('gemini-pro-vision') # Используем мультимодальную модель
 
-        except Exception as e:
-            print(f"Ошибка при обработке изображения: {e}")
-            ai_response_text = f"Произошла ошибка при обработке вашего фото: {e}. Пожалуйста, попробуйте другое фото."
-            image_base64 = None
+        # Собираем части для запроса к Gemini
+        parts = [
+            f"Как AI-стилист, проанализируй следующий запрос и дай рекомендации по стилю и одежде. "
+            f"Учитывай тип телосложения: {body_type}. "
+            "Ответ должен быть кратким и информативным. "
+            "Если предоставлено изображение, используй его для анализа. "
+            "Не генерируй изображение, просто опиши подходящий образ. "
+            "Вот запрос пользователя: '{user_message}'."
+        ]
 
-    # Если изображение не было сгенерировано (например, если был только текстовый запрос),
-    # используем общую заглушку.
-    if not generated_image_url:
-        ai_response_text = f"Привет! Ваш запрос: '{user_message}'. Тип телосложения: '{body_type}'. " \
-                           f"Я пока не могу генерировать изображения, но могу сказать, что для такого запроса " \
-                           f"обычно подходят: Классическая одежда, удобные аксессуары."
-        generated_image_url = "https://via.placeholder.com/400x300?text=AI+Outfit+Suggestion" # Заглушка
+        if image_base64:
+            try:
+                # Декодируем Base64 в байты изображения
+                image_bytes = base64.b64decode(image_base64)
+                # Определяем MIME-тип. Это критично для Gemini.
+                # В идеале, фронтенд должен передавать тип, но если нет,
+                # можно попробовать определить или просто предположить.
+                # Для этого примера предполагаем, что это JPEG или PNG.
+                # В реальном приложении лучше получать тип с фронтенда.
+                # Например, если ваш JS берет "image/jpeg" или "image/png" из files[0].type
+                
+                # Попробуем определить тип изображения по первым байтам
+                # Это простая эвристика, не надежная для всех случаев!
+                if image_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
+                    mime_type = 'image/png'
+                elif image_bytes.startswith(b'\xff\xd8'):
+                    mime_type = 'image/jpeg'
+                else:
+                    # Если не удалось определить, можно установить тип по умолчанию
+                    # или запросить у пользователя
+                    mime_type = 'image/jpeg' # Предположение по умолчанию
+
+                image_part = {
+                    'mime_type': mime_type,
+                    'data': image_bytes
+                }
+                parts.append(image_part)
+            except Exception as e:
+                print(f"Ошибка декодирования или определения типа изображения Base64: {e}")
+                ai_response_text = f"Произошла ошибка при обработке вашего фото: {e}. " \
+                                   "Пожалуйста, попробуйте другое фото или отправьте только текст."
+                # Продолжаем без изображения, если произошла ошибка его обработки
+                image_base64 = None # Сбросить, чтобы не пытаться отправить некорректное изображение
+
+        # Отправляем запрос к Gemini API
+        gemini_response = model.generate_content(parts)
+        ai_response_text = gemini_response.text
+
+        # Gemini-Pro-Vision сам по себе не генерирует изображения, он их анализирует.
+        # Если вам нужно сгенерировать изображение на основе текстового ответа,
+        # вам понадобится отдельный вызов к DALL-E, Stable Diffusion или другому
+        # сервису генерации изображений.
+        # Пока оставим заглушку для URL изображения.
+        generated_image_url = "https://via.placeholder.com/400x300?text=Style+Suggestion" # Placeholder for now
+
+    except Exception as e:
+        print(f"Ошибка при взаимодействии с Gemini API: {e}")
+        ai_response_text = f"Извините, произошла ошибка при получении рекомендаций от AI: {e}"
+        generated_image_url = "https://via.placeholder.com/400x300?text=AI+Error"
 
     return jsonify({
         "response": ai_response_text,
         "image_url": generated_image_url
     })
-
 
 
 
