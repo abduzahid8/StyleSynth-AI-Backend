@@ -8,27 +8,17 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 import json
+from flask_cors import CORS
 
 # Импортируем необходимые классы из Flask-SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
+app = Flask(__name__)
+CORS(app) # Это включит CORS для всех маршрутов
 
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app) # Enable CORS for all routes
-
-# --- Database Configuration (ИСПРАВЛЕННАЯ И ОКОНЧАТЕЛЬНАЯ ВЕРСИЯ) ---
-# Получаем URL базы данных из переменных окружения Render.com (ключ DATABASE_URL)
-# Если переменная окружения DATABASE_URL не установлена (например, для локальной разработки),
-# используем прямой URL базы данных как резервный вариант.
-# ВНИМАНИЕ: Для продакшн-деплоя на Render, убедитесь, что DATABASE_URL установлен
-# в переменных окружения вашего веб-сервиса на Render.com.
-database_url = os.environ.get('DATABASE_URL')
+database_url = os.environ.get('postgresql://stylesynth_db_user:J9ENRI4k3tWz9PXdMx5xQ2rkfSlC3yfC@dpg-d18stijuibrs73e142p0-a.singapore-postgres.render.com/stylesynth_db')
 if not database_url:
-    # Замените этот URL на ваш актуальный External Database URL с Render.com,
-    # если вы запускаете локально БЕЗ .env файла.
-    # Для деплоя на Render.com, эта строка не будет использоваться,
-    # так как DATABASE_URL будет предоставлен переменной окружения.
     database_url = "postgresql://stylesynth_db_user:J9ENRI4k3tWz9PXdMx5xQ2rkfSlC3yfC@dpg-d18stijuibrs73e142p0-a.singapore-postgres.render.com/stylesynth_db"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
@@ -36,6 +26,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Отключаем, чт�
 
 # Инициализируем SQLAlchemy
 db = SQLAlchemy(app)
+
+@app.route('/')
+def index():
+    return render_template('index.html') # 
+
 
 # Определяем модель данных для пользователя
 class User(db.Model):
