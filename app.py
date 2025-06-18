@@ -9,6 +9,10 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import json
 from flask_cors import CORS
+import base64 # Добавить, если нет
+import requests # Добавить, если нет (для внешних API)
+import io # Добавить, если нет
+from PIL import Image # Добавить, если нет (для обработки изображений)
 
 # Импортируем необходимые классы из Flask-SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
@@ -17,19 +21,34 @@ CORS(app) # Это включит CORS для всех маршрутов
 
 load_dotenv()
 
-database_url = os.environ.get('postgresql://stylesynth_db_user:J9ENRI4k3tWz9PXdMx5xQ2rkfSlC3yfC@dpg-d18stijuibrs73e142p0-a.singapore-postgres.render.com/stylesynth_db')
-if not database_url:
-    database_url = "postgresql://stylesynth_db_user:J9ENRI4k3tWz9PXdMx5xQ2rkfSlC3yfC@dpg-d18stijuibrs73e142p0-a.singapore-postgres.render.com/stylesynth_db"
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Отключаем, чтобы избежать предупреждений
 
 # Инициализируем SQLAlchemy
 db = SQLAlchemy(app)
 
+# --- 5. Маршруты Flask ---
+
 @app.route('/')
 def index():
-    return render_template('index.html') # 
+    """
+    Обслуживает главную HTML-страницу.
+    Убедитесь, что 'index.html' находится в папке 'templates' рядом с 'app.py'.
+    """
+    return render_template('index.html')
+
+@app.route('/create_db')
+def create_db():
+    """
+    Создает все таблицы базы данных, определенные в моделях SQLAlchemy.
+    Это полезно для инициализации базы данных на Render.
+    """
+    try:
+        db.create_all()
+        return "Database tables created successfully!"
+    except Exception as e:
+        return f"Error creating database tables: {e}"
 
 
 # Определяем модель данных для пользователя
@@ -70,6 +89,86 @@ if not REPLICATE_API_TOKEN:
     )
 
 genai.configure(api_key=GEMINI_API_KEY)
+
+
+# --- 4. Определение моделей базы данных ---
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    wardrobe_items = db.relationship('WardrobeItem', backref='owner', lazy=True)
+
+    def __repr__(self):
+        return f'<User {self.username}>'
+
+class WardrobeItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    item_type = db.Column(db.String(100), nullable=False)
+    color = db.Column(db.String(50))
+    style = db.Column(db.String(100))
+    image_url = db.Column(db.String(500))
+    added_date = db.Column(db.DateTime, default=db.func.current_timestamp())
+
+    def __repr__(self):
+        return f'<WardrobeItem {self.item_type} for User {self.user_id}>'
+
+
+
+
+
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """
+    Обрабатывает запросы от фронтенда для получения рекомендаций стилиста AI.
+    Принимает JSON с 'message', 'body_type' и 'image' (Base64).
+    """
+    data = request.get_json()
+    user_message = data.get('message', '')
+    body_type = data.get('body_type', 'стандартный')
+    image_base64 = data.get('image', None)
+
+    if not user_message and not image_base64:
+        return jsonify({"error": "No message or image provided."}), 400
+
+    # --- Логика обработки запроса AI (ЗАГЛУШКА) ---
+    ai_response_text = "Извините, функция AI стилиста пока не реализована."
+    generated_image_url = None
+
+    if image_base64:
+        try:
+            # Декодируем Base64 в байты изображения (для будущей обработки или отправки в AI)
+            image_bytes = base64.b64decode(image_base64)
+            # Здесь вы могли бы отправить image_bytes в реальный AI-сервис
+            ai_response_text = f"Я получил ваше фото и запрос: '{user_message}'. Тип телосложения: {body_type}. " \
+                               f"Сейчас я анализирую это, чтобы дать вам лучшие рекомендации."
+            # Пример URL для изображения (ЗАМЕНИТЕ НА РЕАЛЬНЫЙ URL ОТ AI)
+            generated_image_url = "https://via.placeholder.com/400x300?text=AI+Outfit+Suggestion"
+
+        except Exception as e:
+            print(f"Ошибка при обработке изображения: {e}")
+            ai_response_text = f"Произошла ошибка при обработке вашего фото: {e}. Пожалуйста, попробуйте другое фото."
+            image_base64 = None
+
+    # Если изображение не было сгенерировано (например, если был только текстовый запрос),
+    # используем общую заглушку.
+    if not generated_image_url:
+        ai_response_text = f"Привет! Ваш запрос: '{user_message}'. Тип телосложения: '{body_type}'. " \
+                           f"Я пока не могу генерировать изображения, но могу сказать, что для такого запроса " \
+                           f"обычно подходят: Классическая одежда, удобные аксессуары."
+        generated_image_url = "https://via.placeholder.com/400x300?text=AI+Outfit+Suggestion" # Заглушка
+
+    return jsonify({
+        "response": ai_response_text,
+        "image_url": generated_image_url
+    })
+
+
+
+
+
+
 
 
 # Функция для анализа изображения с помощью Gemini Pro Vision
