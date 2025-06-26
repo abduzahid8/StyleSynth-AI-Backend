@@ -110,7 +110,7 @@ def chat():
     generated_image_url = "https://via.placeholder.com/400x300?text=Error+or+No+Image" # Заглушка по умолчанию
 
     try:
-        model = genai.GenerativeModel('gemini-pro-vision') # Используем мультимодальную модель
+        model = genai.GenerativeModel('gemini-1.5-flash') # Используем мультимодальную модель
 
         # Собираем части для запроса к Gemini
         parts = [
@@ -181,7 +181,7 @@ def chat():
 # Функция для анализа изображения с помощью Gemini Pro Vision
 def analyze_image_with_gemini(image_data):
     try:
-        model = genai.GenerativeModel('gemini-pro-vision')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content([
             "Analyze this image of clothing. Identify the type of garment (e.g., shirt, pants, dress, shoe, jacket), its primary color(s), and its general style (e.g., casual, formal, sporty, elegant). "
             "Return the answer as a JSON object with keys: 'category', 'colors', 'style'. "
@@ -206,7 +206,7 @@ def analyze_image_with_gemini(image_data):
 # Функция для анализа селфи пользователя для определения цвета кожи/тона внешности
 def analyze_user_appearance(image_data):
     try:
-        model = genai.GenerativeModel('gemini-pro-vision')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content([
             "Analyze this portrait image of a person. Identify their primary skin tone (e.g., fair, light, medium, dark), and describe their overall appearance tone (e.g., warm, cool, neutral). "
             "Return the answer as a JSON object with keys: 'skin_tone', 'appearance_tone'. "
