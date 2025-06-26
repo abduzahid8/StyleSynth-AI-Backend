@@ -8,19 +8,19 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 import json
-from flask_cors import CORS
+# from flask_cors import CORS # Уже импортирован выше
 import base64 # Добавить, если нет
-import requests # Добавить, если нет (для внешних API)
+# import requests # Уже импортирован выше
 import io # Добавить, если нет
-from PIL import Image # Добавить, если нет (для обработки изображений)
+# from PIL import Image # Уже импортирован выше
 
 # Импортируем необходимые классы из Flask-SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
-app = Flask(__name__)
+
+load_dotenv() # Загрузка переменных окружения должна быть в самом начале
+
+app = Flask(__name__, template_folder='templates')
 CORS(app) # Это включит CORS для всех маршрутов
-
-load_dotenv()
-
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Отключаем, чтобы избежать предупреждений
@@ -28,52 +28,32 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Отключаем, чт�
 # Инициализируем SQLAlchemy
 db = SQLAlchemy(app)
 
-# --- 5. Маршруты Flask ---
-
-@app.route('/')
-def index():
-    """
-    Обслуживает главную HTML-страницу.
-    Убедитесь, что 'index.html' находится в папке 'templates' рядом с 'app.py'.
-    """
-    return render_template('index.html')
-
-@app.route('/create_db')
-def create_db():
-    """
-    Создает все таблицы базы данных, определенные в моделях SQLAlchemy.
-    Это полезно для инициализации базы данных на Render.
-    """
-    try:
-        db.create_all()
-        return "Database tables created successfully!"
-    except Exception as e:
-        return f"Error creating database tables: {e}"
-
+# --- Определение моделей базы данных (ТОЛЬКО ОДИН РАЗ) ---
 
 # Определяем модель данных для пользователя
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False) # Это поле было во втором определении, но отсутствовало в первом. Выберите, какое вам нужно.
     # Отношение к предметам гардероба
     wardrobe_items = db.relationship('WardrobeItem', backref='owner', lazy=True)
 
     def __repr__(self):
-        return '<User %r>' % self.username
+        return f'<User {self.username}>' # Используйте f-строку для удобства
 
 # Определяем модель данных для предмета гардероба
 class WardrobeItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    image_url = db.Column(db.String(255), nullable=False) # URL для хранения изображения (например, на облачном хранилище)
+    image_url = db.Column(db.String(500)) # Увеличил размер, так как URL могут быть длинными
     category = db.Column(db.String(50), nullable=True) # Рубашка, брюки, платье
     color = db.Column(db.String(50), nullable=True)     # Красный, синий, и т.д.
     style = db.Column(db.String(50), nullable=True)      # Повседневный, деловой, вечерний
-    # Дополнительные поля могут быть добавлены позже
+    item_type = db.Column(db.String(100), nullable=False) # Это поле было во втором определении WardrobeItem
+    added_date = db.Column(db.DateTime, default=db.func.current_timestamp()) # Это поле было во втором определении WardrobeItem
 
     def __repr__(self):
-        return '<WardrobeItem %r>' % self.image_url
-
+        return f'<WardrobeItem {self.item_type} for User {self.user_id}>' # Используйте f-строку
 
 # --- API Key Setup (проверьте, что они есть в Render Environment Variables) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -90,34 +70,32 @@ if not REPLICATE_API_TOKEN:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
+# --- Маршруты Flask ---
 
-# --- 4. Определение моделей базы данных ---
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    wardrobe_items = db.relationship('WardrobeItem', backref='owner', lazy=True)
+@app.route('/')
+def index():
+    """
+    Обслуживает главную HTML-страницу.
+    Убедитесь, что 'index.html' находится в папке 'templates' рядом с 'app.py'.
+    """
+    return render_template('index.html')
 
-    def __repr__(self):
-        return f'<User {self.username}>'
+@app.route('/create_db')
+def create_db_tables_route(): # Изменил имя, чтобы не конфликтовало с функцией ниже
+    """
+    Создает все таблицы базы данных, определенные в моделях SQLAlchemy.
+    Это полезно для инициализации базы данных на Render.
+    """
+    try:
+        with app.app_context():
+            db.create_all()
+        return "Database tables created successfully!"
+    except Exception as e:
+        return f"Error creating database tables: {e}"
 
-class WardrobeItem(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    item_type = db.Column(db.String(100), nullable=False)
-    color = db.Column(db.String(50))
-    style = db.Column(db.String(100))
-    image_url = db.Column(db.String(500))
-    added_date = db.Column(db.DateTime, default=db.func.current_timestamp())
-
-    def __repr__(self):
-        return f'<WardrobeItem {self.item_type} for User {self.user_id}>'
-
-
-
-
-
-
+# Остальные маршруты (chat, analyze_image_with_gemini, generate_clothing_image и т.д.)
+# Здесь ваша функция chat(), generate_clothing_image() и т.д.
+# ... ваш существующий код для маршрутов /chat, /analyze, /generate, /api/...
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json()
@@ -200,11 +178,6 @@ def chat():
     })
 
 
-
-
-
-
-
 # Функция для анализа изображения с помощью Gemini Pro Vision
 def analyze_image_with_gemini(image_data):
     try:
@@ -266,16 +239,18 @@ def generate_clothing_image(prompt):
 
 # --- НОВЫЕ РОУТЫ ДЛЯ БАЗЫ ДАННЫХ И ГАРДЕРОБА ---
 
-@app.route('/create_db')
-def create_db_tables():
-    """Создает таблицы в базе данных. Вызывать ОДИН раз после деплоя."""
-    try:
-        with app.app_context(): # Используем app_context для работы с БД
-            db.create_all()
-        return "Database tables created successfully!"
-    except Exception as e:
-        # Важно: В продакшене лучше не возвращать raw exception, а логировать его.
-        return f"Error creating database tables: {e}", 500
+# Переименовал, чтобы не было дублирования с create_db выше,
+# хотя оно и так было исправлено на create_db_tables_route
+# @app.route('/create_db')
+# def create_db_tables():
+#     """Создает таблицы в базе данных. Вызывать ОДИН раз после деплоя."""
+#     try:
+#         with app.app_context(): # Используем app_context для работы с БД
+#             db.create_all()
+#         return "Database tables created successfully!"
+#     except Exception as e:
+#         # Важно: В продакшене лучше не возвращать raw exception, а логировать его.
+#         return f"Error creating database tables: {e}", 500
 
 @app.route('/api/user/add', methods=['POST'])
 def add_user():
@@ -286,7 +261,7 @@ def add_user():
 
     try:
         with app.app_context():
-            new_user = User(username=username)
+            new_user = User(username=username, email=f"{username}@example.com") # Добавьте email, так как он nullable=False
             db.session.add(new_user)
             db.session.commit()
             return jsonify({"message": "User added successfully", "user_id": new_user.id}), 201
@@ -346,7 +321,8 @@ def add_wardrobe_item(user_id):
                 image_url=mock_image_url, # Замените на реальный URL с облака!
                 category=category,
                 color=color,
-                style=style
+                style=style,
+                item_type=category # Использование category как item_type
             )
             db.session.add(new_item)
             db.session.commit()
@@ -373,7 +349,8 @@ def list_wardrobe_items(user_id):
                 "image_url": item.image_url,
                 "category": item.category,
                 "color": item.color,
-                "style": item.style
+                "style": item.style,
+                "item_type": item.item_type # Включаем item_type
             } for item in items]
             return jsonify({"user_id": user_id, "wardrobe": items_data}), 200
     except Exception as e:
@@ -492,15 +469,14 @@ def add_user_appearance(user_id):
 
         # Здесь вам нужно будет решить, где хранить эту информацию.
         # Идеально, добавить поля 'skin_tone' и 'appearance_tone' в модель User.
-        # Например:
-        # with app.app_context():
-        #     user = User.query.get(user_id)
-        #     if user:
-        #         user.skin_tone = skin_tone
-        #         user.appearance_tone = appearance_tone
-        #         db.session.commit()
-        #     else:
-        #         return jsonify({"error": "User not found"}), 404
+        with app.app_context():
+            user = db.session.get(User, user_id) # Используйте db.session.get для получения по PK
+            if user:
+                user.skin_tone = skin_tone # Вам нужно добавить эти поля в модель User
+                user.appearance_tone = appearance_tone # Вам нужно добавить эти поля в модель User
+                db.session.commit()
+            else:
+                return jsonify({"error": "User not found"}), 404
 
         return jsonify({
             "message": "User appearance analyzed successfully",
