@@ -290,66 +290,38 @@
             }
         }
 
-        // Chat functionality
         async function sendMessage() {
             const userInput = document.getElementById('user-input');
-            const message = userInput.value.trim();
+            const message = userInput.value.trim(); // <-- ВОТ ГДЕ БЕРЕТСЯ СООБЩЕНИЕ
             const bodyType = document.getElementById('body-type-select').value;
             const sendButton = document.getElementById('send-button');
             const chatContainer = document.getElementById('chat-container');
 
-            if (message === '' && !photoBase64) {
+            if (message === '' && !photoBase64) { // Проверка на пустоту сообщения ИЛИ отсутствие фото
                 alert('Пожалуйста, введите сообщение или загрузите фото.');
                 return;
             }
 
             // Добавляем сообщение пользователя в чат
-            addMessageToChat(message, 'user');
+            addMessageToChat(message, 'user'); // <-- Сюда добавляется message (которое может быть пустым)
 
             // Очищаем поле ввода и фото
-            userInput.value = '';
+            userInput.value = ''; // <-- ЗДЕСЬ ПОЛЕ ВВОДА ОЧИЩАЕТСЯ!
             document.getElementById('user-photo').value = ''; // Сбросить выбранный файл
             document.getElementById('photo-preview').style.display = 'none'; // Скрыть превью
             photoBase64 = null; // Очистить Base64 фото
 
-            // Показываем индикатор загрузки
-            const loadingMessageDiv = addMessageToChat('<div class="spinner"></div> AI думает...', 'bot', true);
-            sendButton.disabled = true; // Отключаем кнопку отправки
-
+            // ... остальной код отправки запроса ...
             try {
                 const response = await fetch(`${BACKEND_URL}/chat`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    // ...
                     body: JSON.stringify({
-                        message: message,
+                        message: message, // <-- ЭТО message (которое может быть пустым) ОТПРАВЛЯЕТСЯ НА БЭКЕНД
                         body_type: bodyType,
                         image: photoBase64 // Отправляем Base64 фото или null
                     })
                 });
-
-                const data = await response.json();
-
-                // Удаляем индикатор загрузки
-                loadingMessageDiv.remove();
-
-                if (response.ok) {
-                    addMessageToChat(data.response, 'bot');
-                    if (data.image_url) {
-                        showGeneratedImages([data.image_url]);
-                    } else {
-                        addMessageToChat("Не удалось сгенерировать изображение. Попробуйте еще раз или измените запрос.", 'bot');
-                    }
-                } else {
-                    addMessageToChat(`Ошибка: ${data.error || 'Неизвестная ошибка на сервере.'}`, 'bot');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                loadingMessageDiv.remove(); // Удаляем индикатор загрузки даже при ошибке сети
-                addMessageToChat('Произошла ошибка при подключении к серверу. Пожалуйста, попробуйте позже.', 'bot');
-            } finally {
-                sendButton.disabled = false; // Включаем кнопку отправки
+                // ...
             }
         }
 
